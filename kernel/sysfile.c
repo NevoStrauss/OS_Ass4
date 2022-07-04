@@ -16,6 +16,9 @@
 #include "file.h"
 #include "fcntl.h"
 
+#define MAX_DEREFERENCE 31
+int readlink(const char*, char*, int);
+
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
 static int
@@ -64,6 +67,34 @@ sys_dup(void)
     return -1;
   filedup(f);
   return fd;
+}
+
+struct inode*
+dereference_link(const char* path)
+{
+  struct inode* ans;
+  int depth = 0;
+  int len;
+  char path_name[MAXPATH];
+  int buff_size = MAXPATH + 4;
+  char buff[buff_size];
+
+  strncmp(path_name, path, strlen(path));
+
+  while(readlink(path_name, buff, buff_size) == 0 && depth < MAX_DEREFERENCE){
+    len = *((int*)buff);
+    strncpy(path_name, buff + 4, len);
+    depth++;
+  }
+  if(depth >= MAX_DEREFERENCE){
+    return 0;
+  }
+
+  if((ans = namei(path_name)) == 0){
+    return 0;
+  }
+
+  return ans;
 }
 
 uint64
@@ -156,13 +187,13 @@ sys_link(void)
 
   return 0;
 
-bad:
-  ilock(ip);
-  ip->nlink--;
-  iupdate(ip);
-  iunlockput(ip);
-  end_op();
-  return -1;
+  bad:
+    ilock(ip);
+    ip->nlink--;
+    iupdate(ip);
+    iunlockput(ip);
+    end_op();
+    return -1;
 }
 
 // Is the directory dp empty except for "." and ".." ?
@@ -232,10 +263,10 @@ sys_unlink(void)
 
   return 0;
 
-bad:
-  iunlockput(dp);
-  end_op();
-  return -1;
+  bad:
+    iunlockput(dp);
+    end_op();
+    return -1;
 }
 
 static struct inode*
@@ -307,6 +338,11 @@ sys_open(void)
     if((ip = namei(path)) == 0){
       end_op();
       return -1;
+    }
+     if(ip->type == T_SYMBOLIC){
+      if((ip = dereference_link(path)) == 0){
+        panic("open: Failed\n");
+      }
     }
     ilock(ip);
     if(ip->type == T_DIR && omode != O_RDONLY){
@@ -399,6 +435,13 @@ sys_chdir(void)
     end_op();
     return -1;
   }
+
+   if(ip->type == T_SYMBOLIC){
+      if((ip = dereference_link(path)) == 0){
+        panic("chdir: Failed\n");
+      }
+  }
+
   ilock(ip);
   if(ip->type != T_DIR){
     iunlockput(ip);
@@ -499,7 +542,7 @@ sys_symlink(void)
     
   begin_op();
 
-  ip = create(newpath, T_SYMBOLIC, 0, 0);
+  ip = create(new_path, T_SYMBOLIC, 0, 0);
   if(ip == 0){ 
     end_op();
     return -1;

@@ -6,8 +6,13 @@
 #include "proc.h"
 #include "defs.h"
 #include "elf.h"
+#include "stat.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
 
 static int loadseg(pde_t *pgdir, uint64 addr, struct inode *ip, uint offset, uint sz);
+struct inode* dereference_link(const char* path);
 
 int
 exec(char *path, char **argv)
@@ -27,6 +32,13 @@ exec(char *path, char **argv)
     end_op();
     return -1;
   }
+
+  if(ip->type == T_SYMBOLIC){
+      if((ip = dereference_link(path)) == 0){
+        panic("exec: Failed\n");
+      }
+  }
+
   ilock(ip);
 
   // Check ELF header
