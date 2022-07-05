@@ -180,3 +180,56 @@ filewrite(struct file *f, uint64 addr, int n)
   return ret;
 }
 
+
+int
+readlink(const char* path, char* buff, int buf_size)
+{
+  struct inode* ip;
+  char path_name[MAXPATH];
+  strncpy(path_name, path, strlen(path));
+  begin_op();
+
+  if((ip = namei(path_name)) == 0){
+    end_op();
+    return -1;
+  }
+
+  ilock(ip);
+
+  if(ip->type != T_SYMBOLIC){
+    panic("trying to read a symbolic link which is not synbolic");  
+    iunlock(ip);  //iunlockput???
+    end_op();
+    return -1;
+  }
+
+  int len;
+
+  if(readi(ip, 0, (uint64)&len, 0, sizeof(int)) != sizeof(int)){  //not sure about where does it read
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  if(len > MAXPATH){
+    panic("readlink: too long pathname\n");
+  }
+  if(len > buf_size - 4){
+    panic("readlink: buf_size too small\n");
+  }
+
+  char* sizeb = (char*) &len;
+  for(int i=0; i < sizeof(int); i++){
+    buff[i] = sizeb[i];
+  }
+
+  if(readi(ip, 0, (uint64)buff, sizeof(int), len)!= len){
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+
+  iunlockput(ip);
+  end_op(); //do Ineed to?
+  return 0;
+}
