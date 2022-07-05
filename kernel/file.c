@@ -212,16 +212,13 @@ readlink(const char* path, char* buff, int buf_size)
     return -1;
   }
 
-  if(len > MAXPATH){
-    panic("readlink: long pathname\n");
-  }
-  if(len > buf_size - 4){
-    panic("readlink: buf_size not big enough\n");
+  if(len > MAXPATH || len > buf_size - 4){
+    panic("readlink: failed 3\n");
   }
 
-  char* sizeb = (char*) &len;
+  char* size_buff = (char*) &len;
   for(int i=0; i < sizeof(int); i++){
-    buff[i] = sizeb[i];
+    buff[i] = size_buff[i];
   }
 
   if(readi(ip, 0, (uint64)buff, sizeof(int), len)!= len){
