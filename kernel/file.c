@@ -197,25 +197,26 @@ readlink(const char* path, char* buff, int buf_size)
   ilock(ip);
 
   if(ip->type != T_SYMBOLIC){
-    panic("trying to read a symbolic link which is not synbolic");  
-    iunlock(ip);  //iunlockput???
+    panic("readlink: failed");  
+    iunlock(ip);
     end_op();
     return -1;
   }
 
   int len;
 
-  if(readi(ip, 0, (uint64)&len, 0, sizeof(int)) != sizeof(int)){  //not sure about where does it read
+  if(readi(ip, 0, (uint64)&len, 0, sizeof(int)) != sizeof(int)){
+    panic("readlink: failed 2"); 
     iunlockput(ip);
     end_op();
     return -1;
   }
 
   if(len > MAXPATH){
-    panic("readlink: too long pathname\n");
+    panic("readlink: long pathname\n");
   }
   if(len > buf_size - 4){
-    panic("readlink: buf_size too small\n");
+    panic("readlink: buf_size not big enough\n");
   }
 
   char* sizeb = (char*) &len;
@@ -230,6 +231,6 @@ readlink(const char* path, char* buff, int buf_size)
   }
 
   iunlockput(ip);
-  end_op(); //do Ineed to?
+  end_op();
   return 0;
 }
